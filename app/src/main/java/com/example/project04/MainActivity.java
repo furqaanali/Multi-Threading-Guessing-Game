@@ -6,7 +6,9 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
+import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -20,6 +22,8 @@ import java.util.ArrayList;
 public class MainActivity extends AppCompatActivity {
 
     Button button;
+    Button button2;
+
     ListView listview1;
     ListView listview2;
 
@@ -29,13 +33,19 @@ public class MainActivity extends AppCompatActivity {
     ArrayAdapter<String> adapter1;
     ArrayAdapter<String> adapter2;
 
+    Handler mainHandler;
+
+    PlayerOneThread playerOneThread;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+
         button = findViewById(R.id.button);
+        button2 = findViewById(R.id.button2);
 
         listview1 = findViewById(R.id.list_thread1);
         listview2 = findViewById(R.id.list_thread2);
@@ -45,21 +55,30 @@ public class MainActivity extends AppCompatActivity {
         adapter2 = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, listItems2);
         listview2.setAdapter(adapter2);
 
+        mainHandler = new Handler();
+
+        playerOneThread = new PlayerOneThread();
+        playerOneThread.start();
+
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Toast.makeText(getApplicationContext(), "helloooooooo", Toast.LENGTH_SHORT).show();
-                Thread myThread = new Thread(new Runnable() {
+
+                playerOneThread.playerOneHandler.post(new Runnable() {
                     @Override
                     public void run() {
+
                         for (int i = 0; i < 10; i++) {
                             try {
+                                Log.i("Test", "hi " + i);
                                 Thread.sleep(1000);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
+
                             final int finalI = i;
-                            runOnUiThread(new Runnable() {
+                            mainHandler.post(new Runnable() {
                                 @Override
                                 public void run() {
                                     button.setText("x: " + finalI);
@@ -70,11 +89,30 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             });
                         }
+
                     }
                 });
-                myThread.start();
+
             }
         });
+    }
+
+
+    public class PlayerOneThread extends Thread {
+
+        public Handler playerOneHandler;
+
+        public void run() {
+            Looper.prepare();
+
+            playerOneHandler = new Handler() {
+                public void handleMessage(Message msg) {
+                    // process incoming messages here
+                }
+            };
+
+            Looper.loop();
+        }
     }
 
 
