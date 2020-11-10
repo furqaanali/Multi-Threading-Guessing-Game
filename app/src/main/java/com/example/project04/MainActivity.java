@@ -42,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
 
     final int MAKING_GUESS = 0;
     final int MISSED_DIGIT = 1;
+    final int PLAY_TURN = 2;
 
     boolean gameOver;
     int numGuesses;
@@ -115,12 +116,14 @@ public class MainActivity extends AppCompatActivity {
 
                     switch (msg.what) {
                         case MAKING_GUESS:
-                            evaluateGuess(sequence, msg.arg1, listItems2, adapter2, playerTwoThread.playerTwoHandler, listItems1, adapter1);
-                            if (!gameOver) playTurn(missedDigits, prevGuesses);
+                            evaluateGuess(sequence, msg.arg1, listItems2, adapter2, playerTwoThread.playerTwoHandler, listItems1, adapter1, playerOneHandler);
                             break;
                         case MISSED_DIGIT:
                             missedDigits.add((char) msg.arg1);
-
+                            break;
+                        case PLAY_TURN:
+                            if (!gameOver) playTurn(missedDigits, prevGuesses);
+                            break;
                         default:
 
                     }
@@ -148,6 +151,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void playTurn(ArrayList<Character> missedDigits, ArrayList<Integer> prevGuesses) {
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
             // Display current thread's guess
             final int guess = generateNumber(missedDigits, prevGuesses);
@@ -185,12 +194,14 @@ public class MainActivity extends AppCompatActivity {
                     // process incoming messages here
                     switch (msg.what) {
                         case MAKING_GUESS:
-                            evaluateGuess(sequence, msg.arg1, listItems1, adapter1, playerOneThread.playerOneHandler, listItems2, adapter2);
+                            evaluateGuess(sequence, msg.arg1, listItems1, adapter1, playerOneThread.playerOneHandler, listItems2, adapter2, playerTwoHandler);
                             numGuesses++;
-                            if (!gameOver) playTurn(missedDigits, prevGuesses);
                             break;
                         case MISSED_DIGIT:
                             missedDigits.add((char) msg.arg1);
+                            break;
+                        case PLAY_TURN:
+                            if (!gameOver) playTurn(missedDigits, prevGuesses);
                             break;
                         default:
 
@@ -219,6 +230,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void playTurn(ArrayList<Character> missedDigits, ArrayList<Integer> prevGuesses) {
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
             // Display current thread's guess
             final int guess = generateNumber(missedDigits, prevGuesses);
@@ -261,7 +278,7 @@ public class MainActivity extends AppCompatActivity {
         return num;
     }
 
-    public void evaluateGuess(final int sequence, final int guess, final ArrayList<String> listItems, final ArrayAdapter<String> adapter, Handler handler, final ArrayList<String> otherListItems, final ArrayAdapter<String> otherAdapter) {
+    public void evaluateGuess(final int sequence, final int guess, final ArrayList<String> listItems, final ArrayAdapter<String> adapter, Handler handler, final ArrayList<String> otherListItems, final ArrayAdapter<String> otherAdapter, Handler selfHandler) {
 
         if (sequence == guess || numGuesses >= 20) {
             gameOver = true;
@@ -325,13 +342,18 @@ public class MainActivity extends AppCompatActivity {
                 adapter.notifyDataSetChanged();
             }
         });
-        
+
 
         try {
             Thread.sleep(2000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+        Message msg = Message.obtain();
+        msg.what = PLAY_TURN;
+        selfHandler.sendMessage(msg);
+
     }
 
 
