@@ -18,6 +18,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -36,6 +38,7 @@ public class MainActivity extends AppCompatActivity {
     Handler mainHandler;
 
     PlayerOneThread playerOneThread;
+    PlayerTwoThread playerTwoThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,41 +60,19 @@ public class MainActivity extends AppCompatActivity {
 
         mainHandler = new Handler();
 
-        playerOneThread = new PlayerOneThread();
-        playerOneThread.start();
+//        playerOneThread = new PlayerOneThread();
+//        playerOneThread.start();
 
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Toast.makeText(getApplicationContext(), "helloooooooo", Toast.LENGTH_SHORT).show();
 
-                playerOneThread.playerOneHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
+                playerOneThread = new PlayerOneThread();
+                playerTwoThread = new PlayerTwoThread();
 
-                        for (int i = 0; i < 10; i++) {
-                            try {
-                                Log.i("Test", "hi " + i);
-                                Thread.sleep(1000);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-
-                            final int finalI = i;
-                            mainHandler.post(new Runnable() {
-                                @Override
-                                public void run() {
-                                    button.setText("x: " + finalI);
-                                    listItems1.add("list1: "+finalI);
-                                    listItems2.add("list2: "+finalI);
-                                    adapter1.notifyDataSetChanged();
-                                    adapter2.notifyDataSetChanged();
-                                }
-                            });
-                        }
-
-                    }
-                });
+                playerOneThread.start();
+                playerTwoThread.start();
 
             }
         });
@@ -111,8 +92,95 @@ public class MainActivity extends AppCompatActivity {
                 }
             };
 
+            final int sequence = generateNumber();
+
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    listItems1.add("Chosen Sequence: " + sequence);
+                    adapter1.notifyDataSetChanged();
+                }
+            });
+
+            for (int i = 0; i < 3; i++) {
+                try {
+                    Log.i("Test", "hi " + i);
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                final int finalI = i;
+                mainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        listItems1.add("list1: "+finalI);
+                        adapter1.notifyDataSetChanged();
+                    }
+                });
+            }
+
+            Message msg = Message.obtain();
+            msg.arg1 = sequence;
+            playerTwoThread.playerTwoHandler.sendMessage(msg);
+
+
             Looper.loop();
         }
+    }
+
+    public class PlayerTwoThread extends Thread {
+
+        public Handler playerTwoHandler;
+
+        public void run() {
+            Looper.prepare();
+
+            playerTwoHandler = new Handler() {
+                public void handleMessage(Message msg) {
+                    // process incoming messages here
+
+                    final int num = msg.arg1;
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            listItems2.add("Other players #: " + num);
+                            adapter2.notifyDataSetChanged();
+                        }
+                    });
+                }
+            };
+
+            final int sequence = generateNumber();
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    listItems2.add("Chosen Sequence: " + sequence);
+                    adapter2.notifyDataSetChanged();
+                }
+            });
+
+
+            Looper.loop();
+        }
+    }
+
+    public boolean isValidNumber(int number) {
+        if (number < 1234 || number > 9876) return false;
+        char[] numberArray = Integer.toString(number).toCharArray();
+        HashSet<Character> set = new HashSet<>();
+        for (char c : numberArray) {
+            if (set.contains(c)) return false;
+            set.add(c);
+        }
+        return true;
+    }
+
+    public int generateNumber() {
+        int num = ThreadLocalRandom.current().nextInt(1000, 9999 + 1);
+        while (!isValidNumber(num))
+            num = ThreadLocalRandom.current().nextInt(1000, 9999 + 1);
+        return num;
     }
 
 
