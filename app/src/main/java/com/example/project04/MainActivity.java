@@ -60,8 +60,6 @@ public class MainActivity extends AppCompatActivity {
 
         mainHandler = new Handler();
 
-//        playerOneThread = new PlayerOneThread();
-//        playerOneThread.start();
 
         button.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -89,6 +87,15 @@ public class MainActivity extends AppCompatActivity {
             playerOneHandler = new Handler() {
                 public void handleMessage(Message msg) {
                     // process incoming messages here
+
+                    final int num = msg.arg1;
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            listItems1.add("Received: " + num);
+                            adapter1.notifyDataSetChanged();
+                        }
+                    });
                 }
             };
 
@@ -102,22 +109,11 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-            for (int i = 0; i < 3; i++) {
-                try {
-                    Log.i("Test", "hi " + i);
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
 
-                final int finalI = i;
-                mainHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        listItems1.add("list1: "+finalI);
-                        adapter1.notifyDataSetChanged();
-                    }
-                });
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
 
             Message msg = Message.obtain();
@@ -144,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            listItems2.add("Other players #: " + num);
+                            listItems2.add("Received: " + num);
                             adapter2.notifyDataSetChanged();
                         }
                     });
@@ -160,6 +156,15 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            Message msg = Message.obtain();
+            msg.arg1 = sequence;
+            playerOneThread.playerOneHandler.sendMessage(msg);
 
             Looper.loop();
         }
