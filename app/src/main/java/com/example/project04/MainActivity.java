@@ -23,8 +23,10 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class MainActivity extends AppCompatActivity {
 
+    TextView textView1;
+    TextView textView2;
+
     Button button;
-    Button button2;
 
     ListView listview1;
     ListView listview2;
@@ -41,6 +43,9 @@ public class MainActivity extends AppCompatActivity {
     final int MAKING_GUESS = 0;
     final int MISSED_DIGIT = 1;
 
+    boolean gameOver;
+    int numGuesses;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -48,8 +53,10 @@ public class MainActivity extends AppCompatActivity {
 
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
+        textView1 = findViewById(R.id.textView1);
+        textView2 = findViewById(R.id.textView2);
+
         button = findViewById(R.id.button);
-        button2 = findViewById(R.id.button2);
 
         listview1 = findViewById(R.id.list_thread1);
         listview2 = findViewById(R.id.list_thread2);
@@ -65,6 +72,19 @@ public class MainActivity extends AppCompatActivity {
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (playerOneThread != null) {
+                    playerOneThread.playerOneHandler.getLooper().quit();
+                    playerTwoThread.playerTwoHandler.getLooper().quit();
+                }
+
+                listItems1.clear();
+                listItems2.clear();
+                adapter1.notifyDataSetChanged();
+                adapter2.notifyDataSetChanged();
+
+                gameOver = false;
+                numGuesses = 0;
+
                 Toast.makeText(getApplicationContext(), "helloooooooo", Toast.LENGTH_SHORT).show();
 
                 playerOneThread = new PlayerOneThread();
@@ -85,8 +105,9 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             Looper.prepare();
 
-            final int sequence = generateNumber();
             final ArrayList<Character> missedDigits = new ArrayList<>();
+            final ArrayList<Integer> prevGuesses = new ArrayList<>();
+            final int sequence = generateNumber(missedDigits, prevGuesses);
 
             playerOneHandler = new Handler() {
                 public void handleMessage(Message msg) {
@@ -94,7 +115,8 @@ public class MainActivity extends AppCompatActivity {
 
                     switch (msg.what) {
                         case MAKING_GUESS:
-                            evaluateGuess(sequence, msg.arg1, listItems2, adapter2, playerTwoThread.playerTwoHandler);
+                            evaluateGuess(sequence, msg.arg1, listItems2, adapter2, playerTwoThread.playerTwoHandler, listItems1, adapter1);
+                            if (!gameOver) playTurn(missedDigits, prevGuesses);
                             break;
                         case MISSED_DIGIT:
                             missedDigits.add((char) msg.arg1);
@@ -105,24 +127,32 @@ public class MainActivity extends AppCompatActivity {
                 }
             };
 
+
+            // Display player's chosen sequence
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    listItems1.add("Chosen Sequence: " + sequence);
-                    adapter1.notifyDataSetChanged();
+                    textView1.setText("Thread 1\nChosen Sequence: " + sequence);
                 }
             });
 
-
             try {
-                Thread.sleep(1000);
+                Thread.sleep(2000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
+            playTurn(missedDigits, prevGuesses);
+
+            Looper.loop();
+        }
+
+        public void playTurn(ArrayList<Character> missedDigits, ArrayList<Integer> prevGuesses) {
 
             // Display current thread's guess
-            final int guess = generateNumber();
+            final int guess = generateNumber(missedDigits, prevGuesses);
+            prevGuesses.add(guess);
+
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -131,15 +161,11 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-
-            // Send guess to opponent thread
+            // Send guess to opponent thread for evaluation
             Message msg = Message.obtain();
             msg.what = MAKING_GUESS;
             msg.arg1 = guess;
             playerTwoThread.playerTwoHandler.sendMessage(msg);
-
-
-            Looper.loop();
         }
     }
 
@@ -150,15 +176,18 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             Looper.prepare();
 
-            final int sequence = generateNumber();
             final ArrayList<Character> missedDigits = new ArrayList<>();
+            final ArrayList<Integer> prevGuesses = new ArrayList<>();
+            final int sequence = generateNumber(missedDigits, prevGuesses);
 
             playerTwoHandler = new Handler() {
                 public void handleMessage(Message msg) {
                     // process incoming messages here
                     switch (msg.what) {
                         case MAKING_GUESS:
-                            evaluateGuess(sequence, msg.arg1, listItems1, adapter1, playerOneThread.playerOneHandler);
+                            evaluateGuess(sequence, msg.arg1, listItems1, adapter1, playerOneThread.playerOneHandler, listItems2, adapter2);
+                            numGuesses++;
+                            if (!gameOver) playTurn(missedDigits, prevGuesses);
                             break;
                         case MISSED_DIGIT:
                             missedDigits.add((char) msg.arg1);
@@ -169,22 +198,32 @@ public class MainActivity extends AppCompatActivity {
                 }
             };
 
+
+            // Display player's chosen sequence
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    listItems2.add("Chosen Sequence: " + sequence);
-                    adapter2.notifyDataSetChanged();
+                    textView2.setText("Thread 2\nChosen Sequence: " + sequence);
                 }
             });
 
             try {
-                Thread.sleep(1000);
+                Thread.sleep(2000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
+            playTurn(missedDigits, prevGuesses);
+
+            Looper.loop();
+        }
+
+        public void playTurn(ArrayList<Character> missedDigits, ArrayList<Integer> prevGuesses) {
+
             // Display current thread's guess
-            final int guess = generateNumber();
+            final int guess = generateNumber(missedDigits, prevGuesses);
+            prevGuesses.add(guess);
+
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -193,42 +232,56 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
+
             // Send guess to opponent thread
             Message msg = Message.obtain();
             msg.what = MAKING_GUESS;
             msg.arg1 = guess;
             playerOneThread.playerOneHandler.sendMessage(msg);
-
-
-            Looper.loop();
         }
     }
 
-    public boolean isValidNumber(int number) {
+    public boolean isValidNumber(int number, ArrayList<Character> missedDigits, ArrayList<Integer> prevGuesses) {
         if (number < 1234 || number > 9876) return false;
+        if (prevGuesses.contains(number)) return false;
         char[] numberArray = Integer.toString(number).toCharArray();
         HashSet<Character> set = new HashSet<>();
         for (char c : numberArray) {
             if (set.contains(c)) return false;
+            if (missedDigits.contains(c)) return false;
             set.add(c);
         }
         return true;
     }
 
-    public int generateNumber() {
+    public int generateNumber(ArrayList<Character> missedDigits, ArrayList<Integer> prevGuesses) {
         int num = ThreadLocalRandom.current().nextInt(1000, 9999 + 1);
-        while (!isValidNumber(num))
+        while (!isValidNumber(num, missedDigits, prevGuesses))
             num = ThreadLocalRandom.current().nextInt(1000, 9999 + 1);
         return num;
     }
 
-    public void evaluateGuess(int sequence, int guess, final ArrayList<String> listItems, final ArrayAdapter<String> adapter, Handler handler) {
-        if (sequence == guess) {
+    public void evaluateGuess(final int sequence, final int guess, final ArrayList<String> listItems, final ArrayAdapter<String> adapter, Handler handler, final ArrayList<String> otherListItems, final ArrayAdapter<String> otherAdapter) {
+
+        if (sequence == guess || numGuesses >= 20) {
+            gameOver = true;
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    listItems.add("Guess was correct!");
+                    if (sequence == guess) {
+                        listItems.add("Guess was correct. You Win!");
+                        otherListItems.add("Opponent guessed sequence. You Lose!");
+                    }
+                    else {
+                        listItems.add("20 guesses made. Game draw!");
+                        otherListItems.add("20 guesses made. Game draw!");
+                    }
                     adapter.notifyDataSetChanged();
+                    otherAdapter.notifyDataSetChanged();
+//                    Message msg = Message.obtain();
+//                    msg.what = GAME_OVER;
+                    playerOneThread.playerOneHandler.getLooper().quit();
+                    playerTwoThread.playerTwoHandler.getLooper().quit();
                 }
             });
             return;
@@ -248,17 +301,7 @@ public class MainActivity extends AppCompatActivity {
             else missedDigits.add(guessArray[i]);
         }
 
-        // display back information
-        final int finalNumCorrectPosition = numCorrectPosition;
-        final int finalNumIncorrectPosition = numIncorrectPosition;
-        mainHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                listItems.add("Num correct pos: " + finalNumCorrectPosition);
-                listItems.add("Num incorrect pos: " + finalNumIncorrectPosition);
-                adapter.notifyDataSetChanged();
-            }
-        });
+        String results = "Num correct pos: " + numCorrectPosition + "\nNum incorrect pos: " + numIncorrectPosition;
 
         // send back missed digits
         int length = missedDigits.size();
@@ -270,13 +313,24 @@ public class MainActivity extends AppCompatActivity {
             msg.arg1 = missedDigit;
             handler.sendMessage(msg);
 
-            mainHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    listItems.add("Missed Digit: " + missedDigit);
-                    adapter.notifyDataSetChanged();
-                }
-            });
+            results += "\nMissed Digit: " + missedDigit;
+        }
+
+        // Display back results
+        final String finalResults = results;
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                listItems.add(finalResults);
+                adapter.notifyDataSetChanged();
+            }
+        });
+        
+
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 
