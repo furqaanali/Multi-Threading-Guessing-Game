@@ -29,16 +29,17 @@ public class MainActivity extends AppCompatActivity {
     ListView listview1;
     ListView listview2;
 
-    ArrayList<String> listItems1=new ArrayList<String>();
-    ArrayList<String> listItems2=new ArrayList<String>();
-
+    ArrayList<String> listItems1 = new ArrayList<String>();
+    ArrayList<String> listItems2 = new ArrayList<String>();
     ArrayAdapter<String> adapter1;
     ArrayAdapter<String> adapter2;
 
     Handler mainHandler;
-
     PlayerOneThread playerOneThread;
     PlayerTwoThread playerTwoThread;
+
+    final int MAKING_GUESS = 0;
+    final int MISSED_DIGIT = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,22 +85,25 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             Looper.prepare();
 
+            final int sequence = generateNumber();
+            final ArrayList<Character> missedDigits = new ArrayList<>();
+
             playerOneHandler = new Handler() {
                 public void handleMessage(Message msg) {
                     // process incoming messages here
 
-                    final int num = msg.arg1;
-                    mainHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            listItems1.add("Received: " + num);
-                            adapter1.notifyDataSetChanged();
-                        }
-                    });
+                    switch (msg.what) {
+                        case MAKING_GUESS:
+                            evaluateGuess(sequence, msg.arg1, listItems2, adapter2, playerTwoThread.playerTwoHandler);
+                            break;
+                        case MISSED_DIGIT:
+                            missedDigits.add((char) msg.arg1);
+
+                        default:
+
+                    }
                 }
             };
-
-            final int sequence = generateNumber();
 
             mainHandler.post(new Runnable() {
                 @Override
@@ -116,8 +120,22 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
 
+
+            // Display current thread's guess
+            final int guess = generateNumber();
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    listItems1.add("Guessing: " + guess);
+                    adapter1.notifyDataSetChanged();
+                }
+            });
+
+
+            // Send guess to opponent thread
             Message msg = Message.obtain();
-            msg.arg1 = sequence;
+            msg.what = MAKING_GUESS;
+            msg.arg1 = guess;
             playerTwoThread.playerTwoHandler.sendMessage(msg);
 
 
@@ -132,22 +150,25 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             Looper.prepare();
 
+            final int sequence = generateNumber();
+            final ArrayList<Character> missedDigits = new ArrayList<>();
+
             playerTwoHandler = new Handler() {
                 public void handleMessage(Message msg) {
                     // process incoming messages here
+                    switch (msg.what) {
+                        case MAKING_GUESS:
+                            evaluateGuess(sequence, msg.arg1, listItems1, adapter1, playerOneThread.playerOneHandler);
+                            break;
+                        case MISSED_DIGIT:
+                            missedDigits.add((char) msg.arg1);
+                            break;
+                        default:
 
-                    final int num = msg.arg1;
-                    mainHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            listItems2.add("Received: " + num);
-                            adapter2.notifyDataSetChanged();
-                        }
-                    });
+                    }
                 }
             };
 
-            final int sequence = generateNumber();
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -162,9 +183,22 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
 
+            // Display current thread's guess
+            final int guess = generateNumber();
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    listItems2.add("Guessing: " + guess);
+                    adapter2.notifyDataSetChanged();
+                }
+            });
+
+            // Send guess to opponent thread
             Message msg = Message.obtain();
-            msg.arg1 = sequence;
+            msg.what = MAKING_GUESS;
+            msg.arg1 = guess;
             playerOneThread.playerOneHandler.sendMessage(msg);
+
 
             Looper.loop();
         }
@@ -186,6 +220,64 @@ public class MainActivity extends AppCompatActivity {
         while (!isValidNumber(num))
             num = ThreadLocalRandom.current().nextInt(1000, 9999 + 1);
         return num;
+    }
+
+    public void evaluateGuess(int sequence, int guess, final ArrayList<String> listItems, final ArrayAdapter<String> adapter, Handler handler) {
+        if (sequence == guess) {
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    listItems.add("Guess was correct!");
+                    adapter.notifyDataSetChanged();
+                }
+            });
+            return;
+        }
+
+        // count correct digits
+        char[] sequenceArray = Integer.toString(sequence).toCharArray();
+        char[] guessArray = Integer.toString(guess).toCharArray();
+        int numCorrectPosition = 0;
+        int numIncorrectPosition = 0;
+        HashSet<Character> set = new HashSet<>();
+        ArrayList<Character> missedDigits = new ArrayList<>();
+        for (char c : sequenceArray) set.add(c);
+        for (int i = 0; i < guessArray.length; ++i) {
+            if (guessArray[i] == sequenceArray[i]) numCorrectPosition++;
+            else if (set.contains(guessArray[i])) numIncorrectPosition++;
+            else missedDigits.add(guessArray[i]);
+        }
+
+        // display back information
+        final int finalNumCorrectPosition = numCorrectPosition;
+        final int finalNumIncorrectPosition = numIncorrectPosition;
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                listItems.add("Num correct pos: " + finalNumCorrectPosition);
+                listItems.add("Num incorrect pos: " + finalNumIncorrectPosition);
+                adapter.notifyDataSetChanged();
+            }
+        });
+
+        // send back missed digits
+        int length = missedDigits.size();
+        if (length > 0) {
+            int index = ThreadLocalRandom.current().nextInt(0, length);
+            final char missedDigit = missedDigits.get(index);
+            Message msg = Message.obtain();
+            msg.what = MISSED_DIGIT;
+            msg.arg1 = missedDigit;
+            handler.sendMessage(msg);
+
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    listItems.add("Missed Digit: " + missedDigit);
+                    adapter.notifyDataSetChanged();
+                }
+            });
+        }
     }
 
 
