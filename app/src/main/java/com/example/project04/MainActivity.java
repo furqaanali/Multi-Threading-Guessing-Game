@@ -114,7 +114,7 @@ public class MainActivity extends AppCompatActivity {
                             evaluateGuess(sequence, msg.arg1, listItems2, adapter2, playerTwoThread.playerTwoHandler, listItems1, adapter1, playerOneHandler);
                             break;
                         case MISSED_DIGIT:
-                            missedDigits.add((char) msg.arg1);
+//                            missedDigits.add((char) msg.arg1);
                             break;
                         case PLAY_TURN:
 
@@ -177,9 +177,14 @@ public class MainActivity extends AppCompatActivity {
 
         public void playTurn(ArrayList<Character> missedDigits, ArrayList<Integer> prevGuesses) {
 
+            //
+            // Guessing Strategy 1 (Random)
+            //  Return any randomly generated valid number
+            //
+
             // Display current thread's guess
             final int guess = generateNumber(missedDigits, prevGuesses);
-            prevGuesses.add(guess);
+//            prevGuesses.add(guess);
 
 
             // dont need to wait if first round
@@ -283,6 +288,13 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void playTurn(ArrayList<Character> missedDigits, ArrayList<Integer> prevGuesses) {
+
+            //
+            // Guessing Strategy 2 (Optimized)
+            //  Return a randomly generated valid number
+            //  that is not identical to a previously made guess
+            //  and doesn't contain any "missed digits"
+            //
 
             // Display current thread's guess
             final int guess = generateNumber(missedDigits, prevGuesses);
