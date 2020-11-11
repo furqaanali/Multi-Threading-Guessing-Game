@@ -45,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
     final int PLAY_TURN = 2;
 
     boolean gameOver;
+    boolean restartedGame;
     int numGuesses;
 
     @Override
@@ -73,20 +74,13 @@ public class MainActivity extends AppCompatActivity {
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                gameOver = true;
+
                 if (playerOneThread != null) {
                     playerOneThread.playerOneHandler.getLooper().quit();
                     playerTwoThread.playerTwoHandler.getLooper().quit();
+                    restartedGame = true;
                 }
-
-                listItems1.clear();
-                listItems2.clear();
-                adapter1.notifyDataSetChanged();
-                adapter2.notifyDataSetChanged();
-
-                gameOver = false;
-                numGuesses = 0;
-
-                Toast.makeText(getApplicationContext(), "helloooooooo", Toast.LENGTH_SHORT).show();
 
                 playerOneThread = new PlayerOneThread();
                 playerTwoThread = new PlayerTwoThread();
@@ -116,12 +110,14 @@ public class MainActivity extends AppCompatActivity {
 
                     switch (msg.what) {
                         case MAKING_GUESS:
+
                             evaluateGuess(sequence, msg.arg1, listItems2, adapter2, playerTwoThread.playerTwoHandler, listItems1, adapter1, playerOneHandler);
                             break;
                         case MISSED_DIGIT:
                             missedDigits.add((char) msg.arg1);
                             break;
                         case PLAY_TURN:
+
                             if (!gameOver) playTurn(missedDigits, prevGuesses);
                             break;
                         default:
@@ -140,10 +136,36 @@ public class MainActivity extends AppCompatActivity {
             });
 
             try {
-                Thread.sleep(2000);
+                Thread.sleep(500);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+
+            if (restartedGame) {
+                mainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(getApplicationContext(), "Restarting Game", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                mainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        listItems1.clear();
+                        listItems2.clear();
+                        adapter1.notifyDataSetChanged();
+                        adapter2.notifyDataSetChanged();
+                    }
+                });
+            }
+
+            gameOver = false;
+            numGuesses = 0;
 
             playTurn(missedDigits, prevGuesses);
 
@@ -152,16 +174,40 @@ public class MainActivity extends AppCompatActivity {
 
         public void playTurn(ArrayList<Character> missedDigits, ArrayList<Integer> prevGuesses) {
 
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
             // Display current thread's guess
             final int guess = generateNumber(missedDigits, prevGuesses);
             prevGuesses.add(guess);
 
+
+            // dont need to wait if first round
+            if (numGuesses > 0) {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            // display round number
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (!gameOver) {
+                        listItems1.add("Round: " + (numGuesses + 1));
+                        listItems2.add("Round: " + (numGuesses + 1));
+                        adapter1.notifyDataSetChanged();
+                        adapter2.notifyDataSetChanged();
+                    }
+                }
+            });
+
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            // display guess
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -169,6 +215,12 @@ public class MainActivity extends AppCompatActivity {
                     adapter1.notifyDataSetChanged();
                 }
             });
+
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
             // Send guess to opponent thread for evaluation
             Message msg = Message.obtain();
@@ -194,8 +246,8 @@ public class MainActivity extends AppCompatActivity {
                     // process incoming messages here
                     switch (msg.what) {
                         case MAKING_GUESS:
+
                             evaluateGuess(sequence, msg.arg1, listItems1, adapter1, playerOneThread.playerOneHandler, listItems2, adapter2, playerTwoHandler);
-                            numGuesses++;
                             break;
                         case MISSED_DIGIT:
                             missedDigits.add((char) msg.arg1);
@@ -218,24 +270,18 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
+
             try {
-                Thread.sleep(2000);
+                Thread.sleep(500);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
-            playTurn(missedDigits, prevGuesses);
 
             Looper.loop();
         }
 
         public void playTurn(ArrayList<Character> missedDigits, ArrayList<Integer> prevGuesses) {
-
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
 
             // Display current thread's guess
             final int guess = generateNumber(missedDigits, prevGuesses);
@@ -244,11 +290,18 @@ public class MainActivity extends AppCompatActivity {
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    listItems2.add("Guessing: " + guess);
-                    adapter2.notifyDataSetChanged();
+//                    if (!gameOver) {
+                        listItems2.add("Guessing: " + guess);
+                        adapter2.notifyDataSetChanged();
+//                    }
                 }
             });
 
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
             // Send guess to opponent thread
             Message msg = Message.obtain();
@@ -282,6 +335,13 @@ public class MainActivity extends AppCompatActivity {
 
         if (sequence == guess || numGuesses >= 20) {
             gameOver = true;
+
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
@@ -303,6 +363,8 @@ public class MainActivity extends AppCompatActivity {
             });
             return;
         }
+
+        if (selfHandler == playerOneThread.playerOneHandler) numGuesses++;
 
         // count correct digits
         char[] sequenceArray = Integer.toString(sequence).toCharArray();
@@ -338,21 +400,26 @@ public class MainActivity extends AppCompatActivity {
         mainHandler.post(new Runnable() {
             @Override
             public void run() {
-                listItems.add(finalResults);
-                adapter.notifyDataSetChanged();
+                if (!gameOver) {
+                    listItems.add(finalResults);
+                    adapter.notifyDataSetChanged();
+                }
             }
         });
 
 
-        try {
-            Thread.sleep(2000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            Thread.sleep(1000);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
 
-        Message msg = Message.obtain();
-        msg.what = PLAY_TURN;
-        selfHandler.sendMessage(msg);
+        // tell self to play turn
+        if (!gameOver && numGuesses < 20) {
+            Message msg = Message.obtain();
+            msg.what = PLAY_TURN;
+            selfHandler.sendMessage(msg);
+        }
 
     }
 
