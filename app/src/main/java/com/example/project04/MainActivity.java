@@ -153,6 +153,8 @@ public class MainActivity extends AppCompatActivity {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
+
+                // clear screen
                 mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
@@ -164,6 +166,7 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
 
+            // set/reset game values
             gameOver = false;
             numGuesses = 0;
 
@@ -270,13 +273,11 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-
             try {
                 Thread.sleep(500);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-
 
             Looper.loop();
         }
@@ -287,13 +288,12 @@ public class MainActivity extends AppCompatActivity {
             final int guess = generateNumber(missedDigits, prevGuesses);
             prevGuesses.add(guess);
 
+            // Display guess
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
-//                    if (!gameOver) {
-                        listItems2.add("Guessing: " + guess);
-                        adapter2.notifyDataSetChanged();
-//                    }
+                    listItems2.add("Guessing: " + guess);
+                    adapter2.notifyDataSetChanged();
                 }
             });
 
@@ -333,30 +333,16 @@ public class MainActivity extends AppCompatActivity {
 
     public void evaluateGuess(final int sequence, final int guess, final ArrayList<String> listItems, final ArrayAdapter<String> adapter, Handler handler, final ArrayList<String> otherListItems, final ArrayAdapter<String> otherAdapter, Handler selfHandler) {
 
-        if (sequence == guess || numGuesses >= 20) {
+        if (sequence == guess) {
             gameOver = true;
-
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
 
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (sequence == guess) {
-                        listItems.add("Guess was correct. You Win!");
-                        otherListItems.add("Opponent guessed sequence. You Lose!");
-                    }
-                    else {
-                        listItems.add("20 guesses made. Game draw!");
-                        otherListItems.add("20 guesses made. Game draw!");
-                    }
+                    listItems.add("Guess was correct. You Win!");
+                    otherListItems.add("Opponent guessed sequence. You Lose!");
                     adapter.notifyDataSetChanged();
                     otherAdapter.notifyDataSetChanged();
-//                    Message msg = Message.obtain();
-//                    msg.what = GAME_OVER;
                     playerOneThread.playerOneHandler.getLooper().quit();
                     playerTwoThread.playerTwoHandler.getLooper().quit();
                 }
@@ -400,25 +386,32 @@ public class MainActivity extends AppCompatActivity {
         mainHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (!gameOver) {
-                    listItems.add(finalResults);
-                    adapter.notifyDataSetChanged();
-                }
+                listItems.add(finalResults);
+                adapter.notifyDataSetChanged();
             }
         });
-
-
-//        try {
-//            Thread.sleep(1000);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
 
         // tell self to play turn
         if (!gameOver && numGuesses < 20) {
             Message msg = Message.obtain();
             msg.what = PLAY_TURN;
             selfHandler.sendMessage(msg);
+        }
+
+        // game draw
+        if (numGuesses >= 20 && selfHandler == playerOneThread.playerOneHandler) {
+            gameOver = true;
+            mainHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    listItems.add("20 guesses made. Game draw!");
+                    otherListItems.add("20 guesses made. Game draw!");
+                    adapter.notifyDataSetChanged();
+                    otherAdapter.notifyDataSetChanged();
+                    playerOneThread.playerOneHandler.getLooper().quit();
+                    playerTwoThread.playerTwoHandler.getLooper().quit();
+                }
+            });
         }
 
     }
